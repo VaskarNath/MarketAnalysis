@@ -14,6 +14,7 @@ def main():
 
     f = open("aapl.json")
     graph_closing_prices(f)
+    # TODO: add string parameter that specifies the interval
 
 
 def graph_closing_prices(f):
