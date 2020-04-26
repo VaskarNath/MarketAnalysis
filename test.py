@@ -2,6 +2,7 @@ import requests
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
+from typing import TextIO, List
 
 
 def main():
@@ -15,6 +16,9 @@ def main():
     f = open("aapl.json")
     graph_closing_prices(f)
     # TODO: add string parameter that specifies the interval
+
+    f = open("nasdaqtraded.txt")
+    print(extract_symbols(f))
 
 
 def graph_closing_prices(f):
@@ -39,6 +43,18 @@ def graph_closing_prices(f):
     plt.gcf().autofmt_xdate()
     plt.title("Graph of Closing Prices for " + stock_data["Meta Data"]["2. Symbol"])
     plt.show()
+
+
+def extract_symbols(f: TextIO) -> List[List[str]]:
+    """
+    Given a csv file with delimeter "|", extract all the stock symbols
+
+    :param: file with all the information
+    :return: A list of all the stock symbols
+    """
+
+    df = pd.read_csv(f, delimiter="|")
+    return [df["Symbol"].tolist(), df["NASDAQ Symbol"].tolist()]
 
 
 if __name__ == "__main__":
