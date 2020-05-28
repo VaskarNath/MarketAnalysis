@@ -3,6 +3,9 @@ import json
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import TextIO, List
+import datetime as dt
+from matplotlib import style
+import pandas_datareader.data as web
 
 
 def main():
@@ -17,8 +20,8 @@ def main():
     graph_closing_prices(f, "60min")
     # TODO: add string parameter that specifies the interval
 
-    f = open("nasdaqtraded.txt")
-    print(extract_symbols(f))
+    # f = open("nasdaqtraded.txt")
+    # print(extract_symbols(f))
 
 
 def graph_closing_prices(f, interval: str) -> None:
@@ -57,6 +60,13 @@ def extract_symbols(f: TextIO) -> List[List[str]]:
     df = pd.read_csv(f, delimiter="|")
     return [df["Symbol"].tolist(), df["NASDAQ Symbol"].tolist()]
 
+def get_data(start, end, symbol):
+    style.use('ggplot')
+    df = web.DataReader(symbol, 'yahoo', start, end)
+    print(df.head(6))
 
 if __name__ == "__main__":
+    start = dt.datetime(2020, 5, 20)
+    end = dt.datetime(2020, 5, 28)
+    get_data(start, end, "GNUS")
     main()
