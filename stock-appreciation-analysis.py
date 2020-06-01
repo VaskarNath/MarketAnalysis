@@ -114,8 +114,8 @@ if __name__ == "__main__":
 
     result_pos, result_neg = get_max_and_min_increase(f, start, end, x)
 
-    pos_file = options.start + "-" + options.end + "-pos"
-    neg_file = options.start + "-" + options.end + "-neg"
+    pos_file = "output/" + options.start + "-" + options.end + "-pos"
+    neg_file = "output/" + options.start + "-" + options.end + "-neg"
     #
     with open(pos_file, 'w') as fp:
         json.dump(result_pos, fp)
