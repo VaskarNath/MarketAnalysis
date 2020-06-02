@@ -39,10 +39,8 @@ class SyncedList:
             if self._head is None:
                 return None
             else:
-                print("Entering lock")
                 head = self._head
                 self._head = self._head.next
-                print("Exiting lock")
                 return head.val
 
     """

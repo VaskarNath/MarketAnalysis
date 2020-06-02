@@ -5,20 +5,32 @@ import pandas as pd
 from pandas import DataFrame
 from matplotlib import style
 from data_requests import get_data
+from synced_list import SyncedList
+from messaging import Listener, Message
+import threading
+from typing import Optional, List
+import time
 
+
+NUM_THREADS = 3
 """
-Return the n-day simple moving average for the given security, over the given range
-as a DataFrame with index "Date" and one column "Average"
+Return DataFrame containing an n-day moving average over the given range, from start to end. Note that depending on n,
+there will be days close to start that do not have entries as there aren't enough historical data points to compute a
+moving average.
+
+The returned DataFrame has index "Date" and one column, "Average"
 """
+def moving_average(symbol, start, end, n) -> Optional[pd.DataFrame]:
+    try:
+        df = get_data(symbol, start, end)
+        close_prices = DataFrame()
+        close_prices["Average"] = df["Adj Close"].rolling(window=n).mean()
+
+        return close_prices
+    except KeyError:
+        return None
 
 
-def moving_average(symbol, start, end, n):
-    df = get_data(symbol, start, end)
-
-    close_prices = DataFrame()
-    close_prices["Average"] = df["Adj Close"].rolling(window=n).mean()
-
-    return close_prices
 
 
 """
@@ -26,46 +38,86 @@ Check for a cross by the short-day moving average above the long-day moving aver
 within the last five days of trading. Returns the date on which the short-day average
 closed above the long-day average.
 """
-def cross_above(symbol: str, short: int, long: int) -> datetime.datetime:
-    print(f"Checking {symbol}...")
+
+
+def cross_above(symbol: str, listener: Listener, short: int, long: int) -> datetime.datetime:
+    msg = Message()
+    msg.add_line(f"Checking {symbol}...")
+    listener.send(msg)
 
     # We use date subtraction for the start argument to ensure that there's enough data for the last 5 days of trading,
     # because weekends and holidays have the potential to lead us to fetch too few data points
-    short_average = moving_average(symbol, datetime.datetime.today() - datetime.timedelta(7 + 2*long),
+    short_average = moving_average(symbol, datetime.datetime.today() - datetime.timedelta(7 + 2 * long),
                                    datetime.datetime.today(), short)
-    long_average = moving_average(symbol, datetime.datetime.today() - datetime.timedelta(7 + 2*long),
+    long_average = moving_average(symbol, datetime.datetime.today() - datetime.timedelta(7 + 2 * long),
                                   datetime.datetime.today(), long)
 
-    days = short_average.tail(5).index
+    if short_average is not None and long_average is not None:
 
-    for i in range(len(days) - 1):
-        if (short_average["Average"][days[i]] <= long_average["Average"][days[i]]
-                and short_average["Average"][days[i + 1]] > long_average["Average"][days[i + 1]]):
-            print("============|============")
-            print("Cross above found: " + symbol)
-            print("On day " + str(days[i+1]))
-            print("============|============")
-            return days[i+1]
+        days = short_average.tail(5).index
+
+        for i in range(len(days) - 1):
+            if (short_average["Average"][days[i]] <= long_average["Average"][days[i]]
+                    and short_average["Average"][days[i + 1]] > long_average["Average"][days[i + 1]]):
+                msg = Message()
+                msg.add_line("============|============")
+                msg.add_line("Cross above found: " + symbol)
+                msg.add_line("On day " + str(days[i + 1]))
+                msg.add_line("============|============")
+                listener.send(msg)
+                return days[i + 1]
+    else:
+        msg = Message()
+        msg.add_line("******************************************************")
+        msg.add_line("Couldn't get data for " + symbol)
+        msg.add_line("******************************************************")
+        listener.send(msg)
 
 
-def symbols_from_json():
-    f = open()
+def check_for_cross(lst: SyncedList, listener: Listener, short: int, long: int):
+    symbol = lst.pop()
+    while symbol is not None:
+        cross_above(symbol, listener, short, long)
+        symbol = lst.pop()
+
+"""
+Spawns NUM_THREADS threads to look for crosses in the given SyncedList of symbols. Returns a list of all threads
+spawned.
+"""
+def analyze_symbols(lst: SyncedList, short: int, long: int) -> List[threading.Thread]:
+    listener = Listener()
+
+    threads = []
+    # Start 5 different threads, each drawing from the same central list of symbols, to look for golden crosses
+    for i in range(NUM_THREADS):
+        x = threading.Thread(target=check_for_cross, args=(lst, listener, short, long))
+        x.start()
+        threads.append(x)
+
+    return threads
+
 
 """
 This script is run by passing in one command-line argument: the name of the source file from which it loads all the
-stock tickers for analysis. This file should be a .csv file, and the list of stock tickers should be under a column
-named "Symbol"
+stock tickers for analysis. This file should simply contain a list of stock tickers, with one ticker per line.
 """
 if __name__ == '__main__':
-    now = datetime.datetime.now()
-    print(f"Started {now.hour}:{now.minute}:{now.second}")
-    style.use("fivethirtyeight")
+    securities = []
 
-    securities = pd.read_csv(sys.argv[1])["Symbol"].to_list()
+    f = open(sys.argv[1], "r")
+    for line in f:
+        line = line.strip()
+        securities.append(line)
 
-    for symbol in securities:
-        if(symbol.isalpha()):
-            cross_above(symbol, 20, 50)
+    lst = SyncedList(securities)
 
-    now = datetime.datetime.now()
-    print(f"Finished {now.hour}:{now.minute}:{now.second}")
+    start = time.time()
+    threads = analyze_symbols(lst, 20, 50)
+    main_thread = threading.current_thread()
+    for thread in threads:
+        if thread is not main_thread:
+            thread.join()
+
+    end = time.time()
+
+    print("Time taken: " + str(end - start))
