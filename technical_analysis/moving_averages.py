@@ -1,26 +1,30 @@
 import datetime
-import matplotlib.pyplot as plt
 import sys
+import threading
+import time
+from typing import Optional, List
+
 import pandas as pd
 from pandas import DataFrame
-from matplotlib import style
+
 from data_requests import get_data
-from synced_list import SyncedList
-from messaging import Listener, Message
-import threading
-from typing import Optional, List
-import time
+from tools.messaging import Listener, Message
+from tools.synced_list import SyncedList
 
-
+"""
+The number of threads that this script will use to accomplish its task.
+"""
 NUM_THREADS = 3
-"""
-Return DataFrame containing an n-day moving average over the given range, from start to end. Note that depending on n,
-there will be days close to start that do not have entries as there aren't enough historical data points to compute a
-moving average.
 
-The returned DataFrame has index "Date" and one column, "Average"
-"""
+
 def moving_average(symbol, start, end, n) -> Optional[pd.DataFrame]:
+    """
+    Return DataFrame containing an <n>-day moving average over the given range, from <start> to <end>. Note that
+    depending on <n>, there will be days close to <start> that do not have entries as there aren't enough historical
+    data points to compute a  moving average.
+
+    The returned DataFrame has index "Date" and one column of data, "Average"
+    """
     try:
         df = get_data(symbol, start, end)
         close_prices = DataFrame()
@@ -31,16 +35,12 @@ def moving_average(symbol, start, end, n) -> Optional[pd.DataFrame]:
         return None
 
 
-
-
-"""
-Check for a cross by the short-day moving average above the long-day moving average
-within the last five days of trading. Returns the date on which the short-day average
-closed above the long-day average.
-"""
-
-
 def cross_above(symbol: str, listener: Listener, short: int, long: int) -> datetime.datetime:
+    """
+    Check for a cross by the <short>-day moving average above the <long>-day moving average
+    within the last five days of trading. Returns the date on which the <short>-day average
+    closed above the <long>-day average.
+    """
     msg = Message()
     msg.add_line(f"Checking {symbol}...")
     listener.send(msg)
@@ -75,16 +75,22 @@ def cross_above(symbol: str, listener: Listener, short: int, long: int) -> datet
 
 
 def check_for_cross(lst: SyncedList, listener: Listener, short: int, long: int):
+    """
+    Check for crosses of the <short>-day moving average above the <long>-day moving average in the last five days of
+    trading. <lst> should be a SyncedList of stock symbols, and listener is what the threads spawned to accomplish the
+    task will use to communicate with the console. 
+    """
     symbol = lst.pop()
     while symbol is not None:
         cross_above(symbol, listener, short, long)
         symbol = lst.pop()
 
-"""
-Spawns NUM_THREADS threads to look for crosses in the given SyncedList of symbols. Returns a list of all threads
-spawned.
-"""
+
 def analyze_symbols(lst: SyncedList, short: int, long: int) -> List[threading.Thread]:
+    """
+    Spawns NUM_THREADS threads to look for crosses in the given SyncedList of symbols. Returns a list of all threads
+    spawned.
+    """
     listener = Listener()
 
     threads = []
