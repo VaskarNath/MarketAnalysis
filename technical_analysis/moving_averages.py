@@ -52,16 +52,12 @@ def cross_above(symbol: str, listener: Listener, short: int, long: int, start: d
     msg.add_line(f"Checking {symbol}...")
     listener.send(msg)
 
-    # We use date subtraction for the start argument to ensure that there's enough data for the last 5 days of trading,
-    # because weekends and holidays have the potential to lead us to fetch too few data points
-    short_average = moving_average(symbol, datetime.datetime.today() - datetime.timedelta(7 + 2 * long),
-                                   datetime.datetime.today(), short)
-    long_average = moving_average(symbol, datetime.datetime.today() - datetime.timedelta(7 + 2 * long),
-                                  datetime.datetime.today(), long)
+    short_average = moving_average(symbol, start, end, short)
+    long_average = moving_average(symbol, start, end, long)
 
     if short_average is not None and long_average is not None:
 
-        days = short_average.tail(5).index
+        days = short_average.index
 
         for i in range(len(days) - 1):
             if (short_average["Average"][days[i]] <= long_average["Average"][days[i]]
@@ -103,7 +99,8 @@ def analyze_symbols(lst: SyncedList, short: int, long: int, start: datetime.date
     listener = Listener()
 
     threads = []
-    # Start 5 different threads, each drawing from the same central list of symbols, to look for golden crosses
+    # Start NUM_THREADS different threads, each drawing from the same central list of symbols, to look for golden
+    # crosses
     for i in range(NUM_THREADS):
         x = threading.Thread(target=check_for_cross, args=(lst, listener, short, long, start, end))
         x.start()
