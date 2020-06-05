@@ -1,4 +1,5 @@
 import datetime
+import math
 import sys
 import threading
 import time
@@ -7,6 +8,7 @@ from typing import Optional, List
 import pandas as pd
 from pandas import DataFrame
 
+sys.path.append("../")
 from data_requests import get_data
 from tools.messaging import Listener, Message
 from tools.synced_list import SyncedList
@@ -19,23 +21,28 @@ NUM_THREADS = 3
 
 def moving_average(symbol, start, end, n) -> Optional[pd.DataFrame]:
     """
-    Return DataFrame containing an <n>-day moving average over the given range, from <start> to <end>. Note that
-    depending on <n>, there will be days close to <start> that do not have entries as there aren't enough historical
-    data points to compute a  moving average.
+    Return DataFrame containing an <n>-day moving average for each trading data between <start> and <end>, inclusive.
+    Note: the range given by start and end doesn't have to include enough data points for a full <n>-day moving average.
+    The method will fetch enough data to calculate the average for each trading data in the given range, and then
+    truncate the returned result.
 
     The returned DataFrame has index "Date" and one column of data, "Average"
     """
     try:
-        df = get_data(symbol, start, end)
+        # We get data from the given range to ensure that we are returned at least enough data points to calculate an
+        # <n>-day moving average for the day <start>. We use n + 3*n/7 below because weekends and holidays take up
+        # somewhat less than 3/7ths of all days
+        df = get_data(symbol, start - datetime.timedelta(n + math.ceil((3 * n) / 7)), end)
         close_prices = DataFrame()
         close_prices["Average"] = df["Adj Close"].rolling(window=n).mean()
 
-        return close_prices
+        return close_prices[start:end]
     except KeyError:
         return None
 
 
-def cross_above(symbol: str, listener: Listener, short: int, long: int) -> datetime.datetime:
+def cross_above(symbol: str, listener: Listener, short: int, long: int, start: datetime.datetime,
+                end: datetime.datetime) -> datetime.datetime:
     """
     Check for a cross by the <short>-day moving average above the <long>-day moving average
     within the last five days of trading. Returns the date on which the <short>-day average
@@ -74,7 +81,8 @@ def cross_above(symbol: str, listener: Listener, short: int, long: int) -> datet
         listener.send(msg)
 
 
-def check_for_cross(lst: SyncedList, listener: Listener, short: int, long: int):
+def check_for_cross(lst: SyncedList, listener: Listener, short: int, long: int, start: datetime.datetime,
+                    end: datetime.datetime):
     """
     Check for crosses of the <short>-day moving average above the <long>-day moving average in the last five days of
     trading. <lst> should be a SyncedList of stock symbols, and listener is what the threads spawned to accomplish the
@@ -82,11 +90,12 @@ def check_for_cross(lst: SyncedList, listener: Listener, short: int, long: int):
     """
     symbol = lst.pop()
     while symbol is not None:
-        cross_above(symbol, listener, short, long)
+        cross_above(symbol, listener, short, long, start, end)
         symbol = lst.pop()
 
 
-def analyze_symbols(lst: SyncedList, short: int, long: int) -> List[threading.Thread]:
+def analyze_symbols(lst: SyncedList, short: int, long: int, start: datetime.datetime, end: datetime.datetime) -> List[
+    threading.Thread]:
     """
     Spawns NUM_THREADS threads to look for crosses in the given SyncedList of symbols. Returns a list of all threads
     spawned.
@@ -96,7 +105,7 @@ def analyze_symbols(lst: SyncedList, short: int, long: int) -> List[threading.Th
     threads = []
     # Start 5 different threads, each drawing from the same central list of symbols, to look for golden crosses
     for i in range(NUM_THREADS):
-        x = threading.Thread(target=check_for_cross, args=(lst, listener, short, long))
+        x = threading.Thread(target=check_for_cross, args=(lst, listener, short, long, start, end))
         x.start()
         threads.append(x)
 
@@ -118,7 +127,7 @@ if __name__ == '__main__':
     lst = SyncedList(securities)
 
     start = time.time()
-    threads = analyze_symbols(lst, 20, 50)
+    threads = analyze_symbols(lst, 20, 50, datetime.datetime.today() - datetime.timedelta(7), datetime.datetime.today())
     main_thread = threading.current_thread()
     for thread in threads:
         if thread is not main_thread:
