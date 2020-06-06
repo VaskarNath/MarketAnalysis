@@ -1,13 +1,22 @@
 import threading
 from typing import List, Optional
 
-from tools.node import Node
+
+
+
+class _Node:
+    """
+    Represents a Node in a linked list, with a value (a string) and a next pointer
+    """
+    def __init__(self, val: str, init_next=None):
+        self.val = val
+        self.next = init_next
 
 
 class SyncedList:
     """
     A pop-only and thread-safe Stack implemented using a LinkedList. Houses a list of strings, and makes use of a thread
-    Lock so as to allow the list to be shared safe as an input between multiple threads. Provides fast and efficient
+    Lock so as to allow the list to be shared safely as an input between multiple threads. Provides fast and efficient
     access to the front of the list thanks to the LinkedList implementation.
 
     Works especially well, for example, as a repository for a central list of stock symbols being operated on by
@@ -20,11 +29,11 @@ class SyncedList:
         """
         self._lock = threading.Lock()
         if len(init) >= 1:
-            self._head = Node(init[0])
+            self._head = _Node(init[0])
             last = self._head
 
             for val in init[1:]:
-                node = Node(val)
+                node = _Node(val)
                 last.next = node
                 last = node
 
