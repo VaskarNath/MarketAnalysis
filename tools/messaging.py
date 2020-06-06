@@ -34,6 +34,12 @@ class Message:
         """
         return self._lines.copy()
 
+    def reset(self):
+        """
+        Reset this Message, emptying its contents so that it can be reused
+        """
+        self._lines = []
+
 
 class Listener:
     """
