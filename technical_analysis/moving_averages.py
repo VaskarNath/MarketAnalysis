@@ -42,11 +42,11 @@ def moving_average(symbol, start, end, n) -> Optional[pd.DataFrame]:
 
 
 def cross_above(symbol: str, listener: Listener, short: int, long: int, start: datetime.datetime,
-                end: datetime.datetime) -> datetime.datetime:
+                end: datetime.datetime):
     """
-    Check for a cross by the <short>-day moving average above the <long>-day moving average
-    within the last five days of trading. Returns the date on which the <short>-day average
-    closed above the <long>-day average.
+    Check for a cross by the <short>-day moving average above the <long>-day moving average some time between <start>
+    and <end>. Prints a message to the console whenever a cross is found, identifying the day on which the short-term
+    moving average closed above the long-term moving average.
     """
     msg = Message()
     msg.add_line(f"Checking {symbol}...")
@@ -62,15 +62,14 @@ def cross_above(symbol: str, listener: Listener, short: int, long: int, start: d
         for i in range(len(days) - 1):
             if (short_average["Average"][days[i]] <= long_average["Average"][days[i]]
                     and short_average["Average"][days[i + 1]] > long_average["Average"][days[i + 1]]):
-                msg = Message()
+                msg.reset()
                 msg.add_line("============|============")
                 msg.add_line("Cross above found: " + symbol)
                 msg.add_line("On day " + str(days[i + 1]))
                 msg.add_line("============|============")
                 listener.send(msg)
-                return days[i + 1]
     else:
-        msg = Message()
+        msg.reset()
         msg.add_line("******************************************************")
         msg.add_line("Couldn't get data for " + symbol)
         msg.add_line("******************************************************")
