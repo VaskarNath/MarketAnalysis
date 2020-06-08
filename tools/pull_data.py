@@ -1,7 +1,9 @@
-from data_requests import get_data
 import datetime as dt
 from typing import List
 import time
+import sys
+sys.path.append("../")
+from data_requests import get_data
 from tools.synced_list import SyncedList
 from tools.messaging import Message, Listener
 import threading
@@ -72,12 +74,13 @@ if __name__ == '__main__':
     symbols = []
     for symbol in source:
         symbol = symbol.strip()
-        symbols.append(symbol)
+        if symbol.isalpha():
+            symbols.append(symbol)
 
     synced = SyncedList(symbols)
 
     threads = []
-    for i in range(3):
+    for i in range(2):
         x = threading.Thread(target=save_symbols, args=(synced, dt.datetime(2010, 1, 1), dt.datetime.today(), Listener()))
         x.start()
         threads.append(x)
