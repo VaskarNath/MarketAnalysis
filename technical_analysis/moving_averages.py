@@ -74,12 +74,12 @@ def EMA(df: DataFrame, column: str, n: int):
     for i in range(n):
         total += df[column][df.index[i]]
 
-    df["EMA"][df.index[n-1]] = total / n
+    df.loc[df.index[n-1], "EMA"] = total / n
 
     smoothing = 2
     multiplier = smoothing / (1+n)
     for i in range(n, len(df.index)):
-        df["EMA"][df.index[i]] = df[column][df.index[i]] * multiplier + df["EMA"][df.index[i-1]] * (1 - multiplier)
+        df.loc[df.index[i], "EMA"] = df[column][df.index[i]] * multiplier + df["EMA"][df.index[i-1]] * (1 - multiplier)
 
 def cross_above(symbol: str, listener: Listener, short: int, long: int, start: datetime.datetime,
                 end: datetime.datetime, local=False, dir="") -> List[datetime.datetime]:
