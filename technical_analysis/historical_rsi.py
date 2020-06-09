@@ -8,8 +8,14 @@ from tools.messaging import Listener
 from tools.messaging import Message
 from technical_analysis.moving_averages import cross_above
 from typing import List
-import datetime as dt
+import datetime as datetime
 
+
+# ANALYSIS CONSTANTS
+RSI_PERIOD = 25
+START_DATE = datetime.datetime(2010, 1, 1)
+END_DATE = datetime.datetime(2019, 12, 31)
+DAYS_TO_ANALYZE = 10
 
 class IndicatorResultTracker:
     """
@@ -95,7 +101,7 @@ def analyze(symbol: str, tracker: IndicatorResultTracker, days: int, listener: L
     # msg.add_line(f"Analyzing {symbol}")
     # listener.send(msg)
 
-    df_rsi = rsi(symbol, dt.datetime(2010, 1, 1), dt.datetime(2019, 12, 31), 25, local=True, dir="../data")
+    df_rsi = rsi(symbol, START_DATE, END_DATE, RSI_PERIOD, local=True, dir="../data")
 
     last_was_oversold = False
     if df_rsi is not None:
@@ -166,4 +172,4 @@ if __name__ == '__main__':
 
     synced = SyncedList(symbols)
 
-    analyze_symbols(synced, 10)
+    analyze_symbols(synced, DAYS_TO_ANALYZE)
