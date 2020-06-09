@@ -22,7 +22,7 @@ NUM_THREADS = 3
 
 def moving_average(symbol, start, end, n, local=False, dir="") -> Optional[pd.DataFrame]:
     """
-    Return DataFrame containing an <n>-day moving average for each trading data between <start> and <end>, inclusive.
+    Return DataFrame containing an <n>-day moving average for each trading day between <start> and <end>, inclusive.
     Note: the range given by start and end doesn't have to include enough data points for a full <n>-day moving average.
     The method will fetch enough data to calculate the average for each trading data in the given range, and then
     truncate the returned result.
@@ -49,14 +49,13 @@ def moving_average(symbol, start, end, n, local=False, dir="") -> Optional[pd.Da
 
 def EMA_from_symbol(symbol, start, end, n, local=False, dir="") -> Optional[DataFrame]:
     # We get data from the given range to ensure that we are returned at least enough data points to calculate an
-    # <n>-day EMA for the day <start>. We use n + 3*n/7 below because weekends and holidays take up
+    # <n>-day EMA for the day <start>. We use (n+1) + 3*(n+1)/7 below because weekends and holidays take up
     # somewhat less than 3/7ths of all days
     df = get_data(symbol, start - datetime.timedelta((n+1) + math.ceil((3 * (n+1)) / 7)), end, local=local, dir=dir)
 
     if df is None:
         return None
 
-    # EMA is calculated by starting off with an n-day simple moving average
     average = DataFrame()
     average["Price"] = df["Adj Close"]
     EMA(average, "Price", n)
@@ -66,7 +65,7 @@ def EMA_from_symbol(symbol, start, end, n, local=False, dir="") -> Optional[Data
 def EMA(df: DataFrame, column: str, n: int):
     """
     Takes the given DataFrame and adds a column to it equal to the <n>-day EMA of the column with the label given by
-    <column>
+    <column>. The new column has label "EMA"
     """
     df["EMA"] = np.nan
 
@@ -74,6 +73,7 @@ def EMA(df: DataFrame, column: str, n: int):
     for i in range(n):
         total += df[column][df.index[i]]
 
+    # EMA is calculated by starting off with an n-day simple moving average
     df.loc[df.index[n-1], "EMA"] = total / n
 
     smoothing = 2
