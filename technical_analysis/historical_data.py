@@ -95,7 +95,7 @@ def analyze(symbol: str, tracker: IndicatorResultTracker, days: int, listener: L
     # msg.add_line(f"Analyzing {symbol}")
     # listener.send(msg)
 
-    df_rsi = rsi(symbol, dt.datetime(2010, 1, 1), dt.datetime(2019, 12, 31), 14, local=True, dir="../data")
+    df_rsi = rsi(symbol, dt.datetime(2010, 1, 1), dt.datetime(2019, 12, 31), 25, local=True, dir="../data")
 
     last_was_oversold = False
     if df_rsi is not None:
