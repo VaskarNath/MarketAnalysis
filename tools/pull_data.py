@@ -16,9 +16,9 @@ def save(symbol: str, start: dt.datetime, end: dt.datetime, listener: Listener) 
     Saves all price data associated with the given symbol as a .csv file in the data directory.
     The .csv file shares the same name as the symbol, and if a file already exists with that name it will be overwritten
     """
-    try:
-        df = get_data(symbol, start, end)
-    except KeyError:
+    df = get_data(symbol, start, end)
+
+    if df is None:
         msg = Message()
         msg.add_line("*****************************")
         msg.add_line(f"KeyError fetching data for {symbol}")
