@@ -21,11 +21,7 @@ def get_data(symbol: str, start:datetime.datetime, end: datetime.datetime, local
             return None
     else:
         try:
-            # The first RSI value in a series is calculated using a simple average of the first <period> data points.
-            # Resultant RSI values use an exponential average. So we get enough data to allow for a buffer of
-            # <period> data points (adding 3 * period / 7 to compensate for holidays and weekends) plus a further
-            # buffer of 300 days, averaging out to about 214 days of trading, to ensure accuracy.
-            df = get_data(symbol, start - datetime.timedelta(period + math.ceil(3 * period / 7) + 300), end)
+            df = web.DataReader(symbol, "yahoo", start, end)
         except KeyError:
             print("KeyError getting RSI data for " + symbol)
             return None
