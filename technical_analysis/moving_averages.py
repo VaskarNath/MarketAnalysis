@@ -6,6 +6,7 @@ import time
 from typing import Optional, List
 
 import pandas as pd
+import numpy as np
 from pandas import DataFrame
 
 sys.path.append("../")
@@ -39,13 +40,46 @@ def moving_average(symbol, start, end, n, local=False, dir="") -> Optional[pd.Da
         df = get_data(symbol, start - datetime.timedelta(n + math.ceil((3 * n) / 7)), end, local=local, dir=dir)
         if df is None:
             return None
-        close_prices = DataFrame()
-        close_prices["Average"] = df["Adj Close"].rolling(window=n).mean()
+        average = DataFrame()
+        average["Average"] = df["Adj Close"].rolling(window=n).mean()
 
-        return close_prices[start:end]
+        return average[start:end]
     except KeyError:
         return None
 
+def EMA_from_symbol(symbol, start, end, n, local=False, dir="") -> Optional[DataFrame]:
+    # We get data from the given range to ensure that we are returned at least enough data points to calculate an
+    # <n>-day EMA for the day <start>. We use n + 3*n/7 below because weekends and holidays take up
+    # somewhat less than 3/7ths of all days
+    df = get_data(symbol, start - datetime.timedelta((n+1) + math.ceil((3 * (n+1)) / 7)), end, local=local, dir=dir)
+
+    if df is None:
+        return None
+
+    # EMA is calculated by starting off with an n-day simple moving average
+    average = DataFrame()
+    average["Price"] = df["Adj Close"]
+    EMA(average, "Price", n)
+
+    return average[start:end]
+
+def EMA(df: DataFrame, column: str, n: int):
+    """
+    Takes the given DataFrame and adds a column to it equal to the <n>-day EMA of the column with the label given by
+    <column>
+    """
+    df["EMA"] = np.nan
+
+    total = 0
+    for i in range(n):
+        total += df[column][df.index[i]]
+
+    df["EMA"][df.index[n-1]] = total / n
+
+    smoothing = 2
+    multiplier = smoothing / (1+n)
+    for i in range(n, len(df.index)):
+        df["EMA"][df.index[i]] = df[column][df.index[i]] * multiplier + df["EMA"][df.index[i-1]] * (1 - multiplier)
 
 def cross_above(symbol: str, listener: Listener, short: int, long: int, start: datetime.datetime,
                 end: datetime.datetime, local=False, dir="") -> List[datetime.datetime]:
