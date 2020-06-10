@@ -19,6 +19,10 @@ The number of threads that this script will use to accomplish its task.
 """
 NUM_THREADS = 3
 
+MACD_SHORT_AVERAGE = 12
+MACD_LONG_AVERAGE = 26
+MACD_SIGNAL_PERIOD = 9
+
 
 def moving_average(symbol, start, end, n, local=False, dir="") -> Optional[pd.DataFrame]:
     """
@@ -31,7 +35,9 @@ def moving_average(symbol, start, end, n, local=False, dir="") -> Optional[pd.Da
     Files in this directory should be .csv's and have filename equal to the stock symbol whose data they are holding.
     This method assumes that the file <symbol>.csv exists in <dir>, if <local>=True.
 
-    The returned DataFrame has index "Date" and one column of data, "Average"
+    The returned DataFrame has index "Date" and one column of data, "Average".
+
+    Returns None in the event of an error fetching data.
     """
     try:
         # We get data from the given range to ensure that we are returned at least enough data points to calculate an
@@ -47,39 +53,93 @@ def moving_average(symbol, start, end, n, local=False, dir="") -> Optional[pd.Da
     except KeyError:
         return None
 
+
 def EMA_from_symbol(symbol, start, end, n, local=False, dir="") -> Optional[DataFrame]:
+    """
+    Return a date-indexed DataFrame with one column: "EMA". "EMA" will contain an <n>-day exponential moving average of
+    closing price, for the range of dates given by <start> and <end>.
+
+    If <local>=True, assumes that <dir> is a string containing a path to a directory containing stock data.
+    Files in this directory should be .csv's and have filename equal to the stock symbol whose data they are holding.
+    This method assumes that the file <symbol>.csv exists in <dir>, if <local>=True.
+
+    Returns None in the event of an error fetching data.
+    """
     # We get data from the given range to ensure that we are returned at least enough data points to calculate an
     # <n>-day EMA for the day <start>. We use (n+1) + 3*(n+1)/7 below because weekends and holidays take up
     # somewhat less than 3/7ths of all days
-    df = get_data(symbol, start - datetime.timedelta((n+1) + math.ceil((3 * (n+1)) / 7)), end, local=local, dir=dir)
+    df = get_data(symbol, start - datetime.timedelta((n + 1) + math.ceil((3 * (n + 1)) / 7)), end, local=local, dir=dir)
 
     if df is None:
         return None
 
     average = DataFrame()
     average["Price"] = df["Adj Close"]
-    EMA(average, "Price", n)
+    EMA(average, "Price", "EMA", n)
+    average.drop(labels="Price", axis=1, inplace=True)
 
     return average[start:end]
 
-def EMA(df: DataFrame, column: str, n: int):
+
+def EMA(df: DataFrame, column: str, result: str, n: int):
     """
     Takes the given DataFrame and adds a column to it equal to the <n>-day EMA of the column with the label given by
-    <column>. The new column has label "EMA"
+    <column>. The new column has label <result>. Assumes there are enough data points to calculate an <n>-day EMA.
+
+    The first n-1 data points of the new <result> column will have value np.nan.
     """
-    df["EMA"] = np.nan
+    df[result] = np.nan
 
     total = 0
     for i in range(n):
         total += df[column][df.index[i]]
 
     # EMA is calculated by starting off with an n-day simple moving average
-    df.loc[df.index[n-1], "EMA"] = total / n
+    df.loc[df.index[n - 1], result] = total / n
 
     smoothing = 2
-    multiplier = smoothing / (1+n)
+    multiplier = smoothing / (1 + n)
     for i in range(n, len(df.index)):
-        df.loc[df.index[i], "EMA"] = df[column][df.index[i]] * multiplier + df["EMA"][df.index[i-1]] * (1 - multiplier)
+        df.loc[df.index[i], result] = df[column][df.index[i]] * multiplier + df[result][df.index[i - 1]] * (
+                    1 - multiplier)
+
+
+def MACD(symbol: str, start: datetime.datetime, end: datetime.datetime, local=False, dir="") -> Optional[DataFrame]:
+    # We need to fetch enough data so that we can compute MACD for the range <start>-<end>. That means, including
+    # weekends and holidays, we need at least MACD_LONG_AVERAGE + 3 * MACD_LONG_AVERAGE / 7 data points to be able
+    # to calculate MACD for the first day of our range. But, we also need enough data points to then take an EMA of the
+    # MACD, for the signal line, of length MACD_SIGNAL_PERIOD. So we need to fetch extra data to compute enough MACD
+    # points to also do that.
+    price_data = get_data(symbol, start - datetime.timedelta(MACD_LONG_AVERAGE + 3 * MACD_LONG_AVERAGE / 7 + (MACD_SIGNAL_PERIOD+1) + 3*(MACD_SIGNAL_PERIOD) / 7 ), end,
+                          local=local, dir=dir)
+
+    if price_data is None:
+        return None
+
+    df = DataFrame()
+    df["Price"] = price_data["Adj Close"]
+    EMA(df, "Price", "Short", MACD_SHORT_AVERAGE)
+    EMA(df, "Price", "Long", MACD_LONG_AVERAGE)
+    df["MACD"] = df["Short"] - df["Long"]
+
+    # So now we've got a DataFrame with columns "Price", "Short", "Long", and "MACD". Because "Short" and "Long" are
+    # moving averages, they each have some number of NaN values at the beginning. And because "MACD" = "Short" - "Long",
+    # so does "MACD". That means that when we calculate an EMA of "MACD" below, it'll get messed up unless we remove the
+    # NaN values. So we do that first.
+
+    # Iterate until i points to the first row that contains an actual value for MACD
+    i = 0
+    while np.isnan(df["MACD"][df.index[i]]):
+        i += 1
+
+    # Chop off all the NaN values
+    df = df[df.index[i]:]
+
+    EMA(df, "MACD", "Signal", MACD_SIGNAL_PERIOD)
+
+    df.drop(labels=["Short", "Long"], axis=1, inplace=True)
+    return df[start:end]
+
 
 def cross_above(symbol: str, listener: Listener, short: int, long: int, start: datetime.datetime,
                 end: datetime.datetime, local=False, dir="") -> List[datetime.datetime]:
@@ -115,7 +175,7 @@ def cross_above(symbol: str, listener: Listener, short: int, long: int, start: d
                 msg.add_line("============|============")
                 listener.send(msg)
 
-                crosses.append(days[i+1])
+                crosses.append(days[i + 1])
 
         return crosses
     else:
