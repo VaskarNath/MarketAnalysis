@@ -1,10 +1,7 @@
 import datetime
-import math
-import time
 
 from typing import Optional
 
-import pandas as pd
 from pandas import DataFrame
 
 import numpy as np
@@ -105,12 +102,11 @@ def check_overbought_oversold(symbols: SyncedList, start: datetime.datetime, end
 
 
 if __name__ == '__main__':
-    # symbols = []
-    # f = open("../s&p500_symbols.txt")
-    # for line in f:
-    #     line = line.strip()
-    #     symbols.append(line)
-    #
-    # lst = SyncedList(symbols)
-    # check_overbought_oversold(lst, datetime.datetime(2020, 6, 5) - datetime.timedelta(14), datetime.datetime(2020, 6, 5), 14, Listener())
-    rsi("AOS", datetime.datetime(2010, 1, 1), datetime.datetime(2019, 12, 31), 14, local=True, dir="../data")
+    symbols = []
+    f = open("../s&p500_symbols.txt")
+    for line in f:
+        line = line.strip()
+        symbols.append(line)
+
+    lst = SyncedList(symbols)
+    check_overbought_oversold(lst, datetime.datetime(2010, 1, 1), datetime.datetime(2019, 12, 31), 14, Listener())

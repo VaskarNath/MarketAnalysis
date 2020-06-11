@@ -6,8 +6,6 @@ from technical_analysis.rsi import rsi
 from tools.synced_list import SyncedList
 from tools.messaging import Listener
 from tools.messaging import Message
-from technical_analysis.moving_averages import cross_above
-from typing import List
 import datetime as datetime
 
 
