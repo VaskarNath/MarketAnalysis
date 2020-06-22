@@ -13,6 +13,7 @@ sys.path.append("../")
 from data_requests import get_data
 from tools.messaging import Listener, Message
 from tools.synced_list import SyncedList
+from tools.synced_output import SyncedFile
 
 """
 The number of threads that this script will use to accomplish its task.
@@ -37,6 +38,8 @@ Define the types of analyses that analyze_symbols can run
 """
 GOLDEN_CROSS = 0
 MACD_SIGNAL_CROSS = 1
+
+signal_output = SyncedFile("../output/MACD_signals.txt")
 
 
 def moving_average(symbol, start, end, n, local=False, dir="") -> Optional[pd.DataFrame]:
@@ -265,7 +268,12 @@ def MACD_signal(symbol: str, listener: Listener, start: datetime.datetime, end: 
     if data is None:
         return []
 
-    EMA(data, "Adj Close", "EMA", 200)
+    try:
+        EMA(data, "Adj Close", "EMA", 200)
+    except NotEnoughDataError as e:
+        msg = Message()
+        msg.add_line(str(e))
+        listener.send(msg)
 
     signals = []
     for i in range(1, len(macd.index)):
@@ -356,13 +364,14 @@ def check_for_MACD_signal_crosses(lst: SyncedList, listener: Listener, start: da
         msg.add_line(f"Analyzing {symbol}...")
         listener.send(msg)
         msg.reset()
-        signals = MACD_signal(symbol, start, end, local=True, dir="../data")
+        signals = MACD_signal(symbol, listener, start, end, local=True, dir="../data")
 
         for signal in signals:
             msg.add_line("======================================")
             msg.add_line(f"Signal on {signal} for {symbol}")
             msg.add_line("======================================")
             listener.send(msg)
+            signal_output.save(msg)
             msg.reset()
 
         symbol = lst.pop()
@@ -383,7 +392,7 @@ def analyze_symbols(lst: SyncedList, start: datetime.datetime, end: datetime.dat
     # Start NUM_THREADS different threads, each drawing from the same central list of symbols, to look for golden
     # crosses
     for i in range(NUM_THREADS):
-        x = threading.Thread(target=func, args=(lst, Listener, start, end))
+        x = threading.Thread(target=func, args=(lst, listener, start, end))
         x.start()
         threads.append(x)
 
@@ -406,7 +415,7 @@ if __name__ == '__main__':
 
     start = time.time()
     threads = analyze_symbols(lst, datetime.datetime.today() - datetime.timedelta(7), datetime.datetime.today(),
-                              check_for_crosses)
+                              check_for_MACD_signal_crosses)
     main_thread = threading.current_thread()
     for thread in threads:
         if thread is not main_thread:
