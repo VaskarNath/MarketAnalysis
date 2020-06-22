@@ -10,9 +10,9 @@ import os
 import sys
 
 
-def save(symbol: str, start: dt.datetime, end: dt.datetime, listener: Listener) -> None:
+def save(symbol: str, start: dt.datetime, end: dt.datetime, listener: Listener, dir: str) -> None:
     """
-    Saves all price data associated with the given symbol as a .csv file in the data directory.
+    Saves all price data associated with the given symbol as a .csv file in the directory given by <dir>
     The .csv file shares the same name as the symbol, and if a file already exists with that name it will be overwritten
     """
     df = get_data(symbol, start, end)
@@ -25,11 +25,27 @@ def save(symbol: str, start: dt.datetime, end: dt.datetime, listener: Listener) 
         listener.send(msg)
         return
 
-    f = open("../data/" + symbol + ".csv", "w")
+    f = open(dir + "/" + symbol + ".csv", "w")
     df.to_csv(f)
 
 
-def save_symbols(symbols: SyncedList, start: dt.datetime, end: dt.datetime, listener: Listener):
+def save_symbols(symbols: SyncedList, start: dt.datetime, end: dt.datetime, listener: Listener, dir: str):
+    """
+    Saves data from the range given by <start>-<end> for each symbol in <symbols>, placing output in the folder
+    given by <dir>.
+
+    For each symbol in <symbols>, fetches as much price data as possible within the given range, and saves it in a file
+    named <symbol>.csv, in the folder given by <dir>.
+    Args:
+        symbols: a SyncedList of stock symbols that should be saved
+        start: a datetime object representing the beginning of the range to try and get data from
+        end:
+        listener:
+        dir:
+
+    Returns:
+
+    """
     msg = Message()
 
     symbol = symbols.pop()
@@ -37,7 +53,7 @@ def save_symbols(symbols: SyncedList, start: dt.datetime, end: dt.datetime, list
         msg.reset()
         msg.add_line("Saving " + symbol + "...")
         listener.send(msg)
-        save(symbol, start, end, listener)
+        save(symbol, start, end, listener, dir)
         symbol = symbols.pop()
 
 
@@ -80,7 +96,7 @@ if __name__ == '__main__':
 
     threads = []
     for i in range(2):
-        x = threading.Thread(target=save_symbols, args=(synced, dt.datetime(2010, 1, 1), dt.datetime.today(), Listener()))
+        x = threading.Thread(target=save_symbols, args=(synced, dt.datetime(2010, 1, 1), dt.datetime.today(), Listener(), sys.argv[1]))
         x.start()
         threads.append(x)
 
